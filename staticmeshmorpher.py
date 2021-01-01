@@ -1,14 +1,13 @@
+import bpy
+
 bl_info = {
-    "name": "StaticMeshMorpher for UnrealEngine4",
+    "name": "StaticMeshMorpher",
     "author": "T_Sumisaki",
-    "version": (1, 0, 0),
+    "version": (1, 0, 1),
     "blender": (2, 80, 0),
-    "description": "StaticMeshMorpher",
+    "description": "Pack static mesh morph target, use VertexColor and UV1, UV2, UV3 (for UE4)",
     "category": "Object",
 }
-
-
-import bpy
 
 
 class SMM_PT_pack_morph_target_panel(bpy.types.Panel):
@@ -32,7 +31,10 @@ class SMM_PT_pack_morph_target_panel(bpy.types.Panel):
         row = layout.row(align=True)
         row.prop(scene, "smm_morph_target_one", text="")
 
-        if scene.smm_morph_target_one is not None:
+        if (
+            scene.smm_morph_target_one is not None
+            and not scene.smm_store_object_pivot_location
+        ):
             layout.label(text="MorphTarget2: ")
             row = layout.row(align=True)
             row.prop(scene, "smm_morph_target_two", text="")
@@ -40,8 +42,8 @@ class SMM_PT_pack_morph_target_panel(bpy.types.Panel):
         row = layout.row(align=True)
         row.prop(scene, "smm_store_morph1_normals")
 
-        row = layout.row(align=True)
-        row.prop(scene, "smm_store_object_pivot_location")
+        # row = layout.row(align=True)
+        # row.prop(scene, "smm_store_object_pivot_location")
 
         row = layout.row(align=True)
 
@@ -92,7 +94,7 @@ class SMM_OT_pack_morph_target(bpy.types.Operator):
             self.report({"ERROR"}, "Choose MorphTarget mesh (Target1)")
             return {"FINISHED"}
 
-        if obj_morph_target_two is not None:
+        if obj_morph_target_two is not None and not store_pivot_location:
             if not is_mesh(obj_morph_target_two):
                 self.report({"ERROR"}, "Choose MorphTarget mesh (Target2)")
                 return {"FINISHED"}
@@ -113,59 +115,62 @@ class SMM_OT_pack_morph_target(bpy.types.Operator):
             return {"FINISHED"}
 
         num_of_verts = get_num_of_verts(original_mesh)
-        buffer0 = [[0, 0, 0]] * num_of_verts
-        buffer2 = [[0, 0, 0]] * num_of_verts
-        buffer3 = [[0, 0, 0]] * num_of_verts
-        buffer4 = [[0, 0, 0]] * num_of_verts
+        arr_normal = [[0, 0, 0]] * num_of_verts
+        arr_uv1 = [[0, 0, 0]] * num_of_verts
+        arr_uv2 = [[0, 0, 0]] * num_of_verts
+        arr_uv3 = [[0, 0, 0]] * num_of_verts
 
         print("Processing morph targets...")
-        vector_offset2 = [0, 0, 0]
-
-        if store_pivot_location:
-            origin_mesh_pivot_pos = obj_original_mesh.location * 255
-            for i in range(num_of_verts):
-                buffer2[i] = [
-                    origin_mesh_pivot_pos[0],
-                    255 - origin_mesh_pivot_pos[1],
-                    0,
-                ]
-            vector_offset2 = origin_mesh_pivot_pos
 
         for i in range(num_of_verts):
 
+            # Cache origin vert and pos
             origin_vert_pos = get_vertex_co(original_mesh, i)
+            origin_mesh_pos = obj_original_mesh.location
+            buf_vert1 = [0, 0, 0]
+            buf_vert2 = [0, 0, 0]
+
+            # Calc target1 vert
             target_vert_pos1 = get_vertex_co(morph_target_one_mesh, i)
+            buf_vert1 = target_vert_pos1 - origin_vert_pos
 
             if two_morph:
+                # Calc target2 vert
                 target_vert_pos2 = get_vertex_co(morph_target_two_mesh, i)
-                vector_offset2 = (target_vert_pos2 - origin_vert_pos)
+                buf_vert2 = target_vert_pos2 - origin_vert_pos
 
-            vector_offset1 = (target_vert_pos1 - origin_vert_pos)
-            new_normal1 = get_vertex_normal(morph_target_one_mesh, i)
-            new_normal1 = arrmul(new_normal1, (1.0, -1.0, 1.0))
-            new_normal1 = arrmul(arradd(new_normal1, 1.0), 0.5)
-            # new_normal1 = arrmul(new_normal1, 255.0)
+            if store_pivot_location:
+                # Calc pivot offset
+                buf_vert2 = origin_mesh_pos
 
-            print(f'VO2: {vector_offset2}')
-            print(f'VO1: {vector_offset1}')
-            print(f'NOR: {new_normal1}')
+            print(f"VO1: {buf_vert1}")
+            print(f"VO2: {buf_vert2}")
+
             if store_morph1_normal:
-                buffer0[i] = new_normal1
+                # Calc Normal
+                # TODO: fix coordinate
+                new_normal1 = get_vertex_normal(morph_target_one_mesh, i)
+                print(f"Origin NOR: {new_normal1}")
+                new_normal1 = arrmul(new_normal1, (1.0, -1.0, 1.0))
+                new_normal1 = arrmul(arradd(new_normal1, 1.0), 0.5)
+                print(f"NOR: {new_normal1}")
+                arr_normal[i] = new_normal1
+                # new_normal1 = arrmul(new_normal1, 255.0)
 
-            if two_morph:
-                buffer2[i] = [vector_offset2[0], (1.0 - (vector_offset2[1] * -1)), 0]
+            arr_uv1[i] = [buf_vert2[0], (1 - buf_vert2[1] * -1), 0]
+            arr_uv2[i] = [buf_vert2[2], (1 - buf_vert1[0]), 0]
+            arr_uv3[i] = [(buf_vert1[1] * -1), (1 - buf_vert1[2]), 0]
 
-            buffer3[i] = [vector_offset2[2], (1.0 - vector_offset1[1]), 0]
-            buffer4[i] = [(vector_offset2[2] * -1), (1.0 - vector_offset1[2]), 0]
+        print(f"[uv1] {arr_uv1}")
+        print(f"[uv2] {arr_uv2}")
+        print(f"[uv3] {arr_uv3}")
 
         if store_morph1_normal:
-            apply_vertex_color(original_mesh, 0, buffer0)
+            apply_vertex_color(original_mesh, 0, arr_normal)
 
-        if two_morph:
-            apply_uv_channel(original_mesh, 1, buffer2)
-
-        apply_uv_channel(original_mesh, 2, buffer3)
-        apply_uv_channel(original_mesh, 3, buffer4)
+        apply_uv_channel(original_mesh, 1, arr_uv1)
+        apply_uv_channel(original_mesh, 2, arr_uv2)
+        apply_uv_channel(original_mesh, 3, arr_uv3)
 
         return {"FINISHED"}
 
@@ -207,38 +212,34 @@ def get_vertex_normal(mesh: bpy.types.Mesh, index: int) -> list:
 def apply_vertex_color(mesh: bpy.types.Mesh, index: int, color: list):
 
     layer = None
-    layer_name = f'Col_{index}'
+    layer_name = f"Col_{index}"
 
-    print(f'Apply vertex color -> {layer_name}')
+    print(f"Apply vertex color -> {layer_name}")
 
     layer = mesh.vertex_colors.get(layer_name)
 
     if layer is None:
         layer = mesh.vertex_colors.new(name=layer_name)
-    
+
     for poly in mesh.polygons:
         for loop_index in poly.loop_indices:
             loop_vert_index = mesh.loops[loop_index].vertex_index
             layer.data[loop_index].color = fillto4(color[loop_vert_index])
 
+
 def apply_uv_channel(mesh: bpy.types.Mesh, index: int, data: list):
 
     layer = None
-    layer_name = f'UVMap_{index}'
-
+    layer_name = f"UVMap_{index}"
 
     layer = mesh.uv_layers.get(layer_name)
     if layer is None:
         layer = mesh.uv_layers.new(name=layer_name)
-    
+
     for poly in mesh.polygons:
         for loop_index in poly.loop_indices:
             loop_vert_index = mesh.loops[loop_index].vertex_index
             layer.data[loop_index].uv = data[loop_vert_index][:2]
-
-
-
-
 
 
 def fillto4(arr):
@@ -250,8 +251,10 @@ def fillto4(arr):
 
     return d
 
+
 def normalize(v, threashold=255.0):
     return v / threashold
+
 
 classes = (SMM_OT_pack_morph_target, SMM_PT_pack_morph_target_panel)
 

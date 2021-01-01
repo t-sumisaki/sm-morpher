@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "sm-morpher"
+version = "0.1.0"
+description = ""
+authors = ["t-sumisaki <mail.sumisaki@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+[tool.poetry.dev-dependencies]
+"fake-bpy-module-2.91" = "^20201216"
+black = {version = "^20.8b1", allow-prereleases = true}
+flake8 = "^3.8.4"
+rope = "^0.18.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

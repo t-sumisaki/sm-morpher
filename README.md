@@ -38,7 +38,7 @@ https://docs.unrealengine.com/ja/WorkingWithContent/Types/StaticMeshes/MorphTarg
 ## トラブルシューティング
 
 - Morph1 が思い通りに動かない
-  - Import 時の設定で `Generate Lightmap UVs` が入っている場合、UV 情報が上書きされて Morph 情報が欠損する場合がある
-    この Addon は UV1 ～ 3 までを使用して Morph 情報を埋め込むので、それらのいずれかが上書きされると正しく動かなくなる
-    LightmapUV を使用する場合、使用する Morph が 1 つであれば、UV1 を使用すること
+  - Import 時の設定で `Generate Lightmap UVs` が入っている場合、UV 情報が上書きされて Morph 情報が欠損する場合がある  
+    この Addon は UV1 ～ 3 までを使用して Morph 情報を埋め込むので、それらのいずれかが上書きされると正しく動かなくなる  
+    LightmapUV を使用する場合、使用する Morph が 1 つであれば、UV1 を使用すること  
     (Morph1 が UV2 ～ 3、Morph2 が UV1 ～ 2 を使用している)
